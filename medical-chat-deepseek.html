@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Медицинский чат-помощник — DeepSeek V4 Pro + RAG</title>
+    <style>
+        :root {
+            --bg: #f5f7fa;
+            --card: #ffffff;
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --text: #1e293b;
+            --text-secondary: #64748b;
+            --border: #e2e8f0;
+            --user-msg: #2563eb;
+            --user-text: #ffffff;
+            --bot-msg: #f1f5f9;
+            --bot-text: #1e293b;
+            --error: #ef4444;
+            --success: #16a34a;
+            --warning: #d97706;
+            --shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            background: var(--card);
+            border-bottom: 1px solid var(--border);
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: var(--shadow);
+        }
+
+        header h1 {
+            font-size: 18px;
+            font-weight: 600;
+            flex: 1;
+        }
+
+        header .badge {
+            font-size: 11px;
+            background: #dbeafe;
+            color: var(--primary);
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-weight: 500;
+        }
+
+        .settings-bar {
+            background: var(--card);
+            border-bottom: 1px solid var(--border);
+            padding: 10px 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .settings-bar label {
+            font-size: 13px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .settings-bar select,
+        .settings-bar input {
+            padding: 6px 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 13px;
+            background: var(--card);
+            color: var(--text);
+        }
+
+        .settings-bar input[type="text"] {
+            width: 200px;
+        }
+
+        .settings-bar .api-status {
+            font-size: 12px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-weight: 500;
+        }
+
+        .api-status.ok {
+            background: #dcfce7;
+            color: var(--success);
+        }
+
+        .api-status.err {
+            background: #fef2f2;
+            color: var(--error);
+        }
+
+        .api-status.na {
+            background: #f1f5f9;
+            color: var(--text-secondary);
+        }
+
+        /* Переключатель режимов */
+        .mode-toggle {
+            display: flex;
+            gap: 0;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .mode-toggle button {
+            padding: 6px 14px;
+            font-size: 12px;
+            font-weight: 500;
+            border: none;
+            cursor: pointer;
+            background: var(--bg);
+            color: var(--text-secondary);
+            transition: all 0.15s;
+        }
+
+        .mode-toggle button.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        .mode-toggle button:not(.active):hover {
+            background: #e2e8f0;
+        }
+
+        .server-indicator {
+            font-size: 12px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-weight: 500;
+        }
+
+        .server-indicator.online {
+            background: #dcfce7;
+            color: var(--success);
+        }
+
+        .server-indicator.offline {
+            background: #fef2f2;
+            color: var(--error);
+        }
+
+        .server-indicator.checking {
+            background: #fef9c3;
+            color: var(--warning);
+        }
+
+        #chat {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .msg {
+            max-width: 80%;
+            padding: 12px 16px;
+            border-radius: 12px;
+            line-height: 1.5;
+            font-size: 14px;
+            animation: fadeIn 0.2s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(4px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .msg.user {
+            align-self: flex-end;
+            background: var(--user-msg);
+            color: var(--user-text);
+            border-bottom-right-radius: 4px;
+        }
+
+        .msg.bot {
+            align-self: flex-start;
+            background: var(--bot-msg);
+            color: var(--bot-text);
+            border-bottom-left-radius: 4px;
+        }
+
+        .msg.bot .thinking {
+            font-size: 12px;
+            color: var(--text-secondary);
+            border-left: 2px solid var(--primary);
+            padding-left: 10px;
+            margin-top: 8px;
+            white-space: pre-wrap;
+        }
+
+        .msg.bot .thinking-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--primary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 8px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .msg.bot .thinking-label:hover {
+            opacity: 0.7;
+        }
+
+        /* Источники (RAG) */
+        .msg.bot .sources {
+            margin-top: 10px;
+            padding-top: 8px;
+            border-top: 1px solid var(--border);
+        }
+
+        .msg.bot .sources-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        .msg.bot .source-item {
+            font-size: 11px;
+            color: var(--text-secondary);
+            padding: 2px 0;
+        }
+
+        .msg.bot .source-item .sim {
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .msg.error {
+            align-self: center;
+            background: #fef2f2;
+            color: var(--error);
+            border: 1px solid #fecaca;
+            font-size: 13px;
+            text-align: center;
+        }
+
+        .msg.loading {
+            align-self: flex-start;
+            background: var(--bot-msg);
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        .msg.loading::after {
+            content: '...';
+            animation: dots 1.5s steps(4, end) infinite;
+        }
+
+        @keyframes dots {
+            0% {
+                content: '';
+            }
+
+            25% {
+                content: '.';
+            }
+
+            50% {
+                content: '..';
+            }
+
+            75% {
+                content: '...';
+            }
+        }
+
+        #input-area {
+            background: var(--card);
+            border-top: 1px solid var(--border);
+            padding: 16px 24px;
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+        }
+
+        #input-area textarea {
+            flex: 1;
+            padding: 10px 14px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            font-size: 14px;
+            font-family: inherit;
+            resize: none;
+            outline: none;
+            min-height: 44px;
+            max-height: 120px;
+            line-height: 1.4;
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        #input-area textarea:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+        }
+
+        #input-area button {
+            padding: 10px 20px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.15s;
+            white-space: nowrap;
+        }
+
+        #input-area button:hover {
+            background: var(--primary-hover);
+        }
+
+        #input-area button:disabled {
+            background: #94a3b8;
+            cursor: not-allowed;
+        }
+
+        .disclaimer {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-align: center;
+            padding: 8px 24px;
+            background: var(--card);
+            border-top: 1px solid var(--border);
+        }
+
+        .disclaimer strong {
+            color: var(--error);
+        }
+
+        @media (max-width: 600px) {
+            .msg {
+                max-width: 92%;
+            }
+
+            #input-area {
+                padding: 12px 16px;
+            }
+
+            #chat {
+                padding: 16px;
+            }
+
+            .settings-bar {
+                padding: 8px 16px;
+            }
+
+            .settings-bar input[type="text"] {
+                width: 140px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <h1>🏥 Медицинский чат-помощник</h1>
+        <span class="badge">DeepSeek V4 Pro + RAG</span>
+    </header>
+
+    <div class="settings-bar">
+        <!-- Переключатель режимов -->
+        <label>Режим:</label>
+        <div class="mode-toggle">
+            <button id="modeDirect" class="active" onclick="setMode('direct')">🌐 Прямое</button>
+            <button id="modeServer" onclick="setMode('server')">🖥️ Сервер (RAG)</button>
+        </div>
+
+        <!-- Модель (только для прямого режима) -->
+        <span id="modelGroup">
+            <label>Модель:</label>
+            <select id="modelSelect">
+                <option value="deepseek-v4-flash" selected>deepseek-v4-flash</option>
+                <option value="deepseek-v4-pro">deepseek-v4-pro</option>
+            </select>
+        </span>
+
+        <!-- API-ключ (только для прямого режима) -->
+        <span id="keyGroup">
+            <label>API-ключ:</label>
+            <input type="text" id="apiKeyInput" placeholder="sk-..." value="">
+            <button onclick="saveKey()"
+                style="padding:6px 12px;font-size:12px;background:#e2e8f0;border:none;border-radius:6px;cursor:pointer;">Сохранить</button>
+            <span id="apiStatus" class="api-status na">● не проверен</span>
+        </span>
+
+        <!-- Статус сервера (только для серверного режима) -->
+        <span id="serverStatusGroup" style="display:none;">
+            <span id="serverIndicator" class="server-indicator offline">● сервер не найден</span>
+        </span>
+    </div>
+
+    <div id="chat">
+        <div class="msg bot">
+            <strong>Здравствуйте!</strong> Я — диагностический помощник на базе <strong>DeepSeek V4 Pro</strong>.
+            <br><br>
+            Опишите ваши симптомы, и я задам серию уточняющих вопросов, чтобы определить
+            <strong>список возможных заболеваний с вероятностью ≥50%</strong>.
+            <br><br>
+            <em style="font-size:12px;color:var(--error);">⚠️ Я не заменяю профессиональную медицинскую консультацию.
+                Финальный диагноз может поставить только врач.</em>
+        </div>
+    </div>
+
+    <div id="input-area">
+        <textarea id="userInput" rows="1" placeholder="Введите ваш медицинский вопрос..."
+            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage()}"></textarea>
+        <button id="sendBtn" onclick="sendMessage()">Отправить</button>
+    </div>
+
+    <div class="disclaimer">
+        <strong>⚠️ Внимание:</strong> Этот чат-бот помогает в предварительной оценке симптомов и не заменяет
+        профессиональную медицинскую диагностику. При любых проблемах со здоровьем обратитесь к врачу.
+    </div>
+
+    <script>
+        // ============================================================
+        // КОНФИГУРАЦИЯ
+        // ============================================================
+        const DEEPSEEK_BASE = 'https://api.deepseek.com';
+        const SERVER_BASE = 'http://localhost:3000';
+
+        // ============================================================
+        // СОСТОЯНИЕ
+        // ============================================================
+        let currentMode = 'direct'; // 'direct' | 'server'
+        let apiKey = localStorage.getItem('deepseek_api_key') || '';
+        let messages = [
+            { role: 'system', content: buildSystemPrompt() }
+        ];
+
+        // ============================================================
+        // DOM-ССЫЛКИ
+        // ============================================================
+        const chatEl = document.getElementById('chat');
+        const inputEl = document.getElementById('userInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const apiKeyInput = document.getElementById('apiKeyInput');
+        const apiStatus = document.getElementById('apiStatus');
+        const modelSelect = document.getElementById('modelSelect');
+        const modeDirect = document.getElementById('modeDirect');
+        const modeServer = document.getElementById('modeServer');
+        const modelGroup = document.getElementById('modelGroup');
+        const keyGroup = document.getElementById('keyGroup');
+        const serverStatusGroup = document.getElementById('serverStatusGroup');
+        const serverIndicator = document.getElementById('serverIndicator');
+
+        // ============================================================
+        // ИНИЦИАЛИЗАЦИЯ
+        // ============================================================
+        if (apiKey) {
+            apiKeyInput.value = apiKey;
+            checkKey();
+        }
+
+        // Проверяем сервер при старте
+        setTimeout(checkServer, 500);
+
+        // ============================================================
+        // SYSTEM PROMPT
+        // ============================================================
+        function buildSystemPrompt() {
+            return `ТЫ — ДИАГНОСТИЧЕСКИЙ ПОМОЩНИК. Твоя задача — собрать анамнез через серию наводящих вопросов и выдать список возможных заболеваний с указанием процента совпадения.
+
+ПРОТОКОЛ РАБОТЫ:
+
+1. ПЕРВЫЙ ШАГ — СБОР СИМПТОМОВ
+   Попроси пользователя описать основные симптомы: локализация, характер боли/дискомфорта, длительность, интенсивность по шкале 0-10.
+
+2. ВТОРОЙ ШАГ — НАВОДЯЩИЕ ВОПРОСЫ (минимум 5, максимум 12)
+   Задавай вопросы ПО ОДНОМУ за раз. Дождись ответа перед следующим вопросом.
+   Используй следующие категории вопросов (выбирай релевантные):
+
+   А) ХАРАКТЕР И ДИНАМИКА СИМПТОМОВ:
+   - Когда именно появились первые симптомы? (дата/время)
+   - Как началось: внезапно или постепенно, в течение нескольких дней/недель?
+   - Какова интенсивность по шкале от 0 до 10? Меняется ли со временем?
+   - Боль/дискомфорт постоянные или приступообразные? Если приступы — как долго длятся?
+
+   Б) ЛОКАЛИЗАЦИЯ И ИРРАДИАЦИЯ:
+   - Где именно ощущается симптом? Можете показать пальцем?
+   - Отдаёт ли боль/ощущение в другие части тела? (например, в руку, челюсть, спину, ногу)
+
+   В) ПРОВОЦИРУЮЩИЕ И ОБЛЕГЧАЮЩИЕ ФАКТОРЫ:
+   - Что усиливает симптомы? (движение, еда, дыхание, положение тела, стресс)
+   - Что облегчает симптомы? (покой, тепло/холод, лекарства, определённая поза)
+
+   Г) СОПУТСТВУЮЩИЕ СИМПТОМЫ:
+   - Есть ли температура, озноб, потливость?
+   - Есть ли тошнота, рвота, диарея, запор?
+   - Есть ли слабость, головокружение, одышка?
+   - Есть ли изменения аппетита, веса, сна?
+
+   Д) АНАМНЕЗ И ФАКТОРЫ РИСКА:
+   - Были ли подобные симптомы раньше? Если да — как часто и чем лечили?
+   - Есть ли хронические заболевания? (диабет, гипертония, астма, гастрит и т.д.)
+   - Принимаете ли регулярно какие-либо лекарства?
+   - Есть ли аллергия на лекарства или продукты?
+   - Курите, употребляете алкоголь? Как часто?
+   - Есть ли наследственные заболевания у близких родственников?
+
+   Е) ОБРАЗ ЖИЗНИ И КОНТЕКСТ:
+   - Чем вы занимаетесь (работа, физическая активность)?
+   - Были ли недавно травмы, операции, инфекции?
+   - Путешествовали ли недавно? Был ли контакт с больными?
+   - У женщин: есть ли беременность? Когда был последний менструальный цикл?
+
+3. ТРЕТИЙ ШАГ — ПРЕДВАРИТЕЛЬНЫЙ АНАЛИЗ
+   После сбора информации (не менее 5 ответов пользователя) выдай структурированный список:
+
+   ## Возможные состояния (вероятность ≥50%)
+
+   | Заболевание | Вероятность | Ключевые совпадения |
+   |---|---|---|
+   | [Название] | [%] | [какие симптомы совпадают] |
+   | [Название] | [%] | [какие симптомы совпадают] |
+
+   Формула расчёта вероятности: (количество совпавших симптомов / общее количество характерных симптомов для данного заболевания) × 100%.
+   Указывай ТОЛЬКО состояния с вероятностью ≥50%.
+
+4. ЧЕТВЁРТЫЙ ШАГ — РЕКОМЕНДАЦИИ
+   После списка добавь:
+   - К какому врачу рекомендовано обратиться
+   - Какие обследования могут потребоваться
+   - Срочность визита (если симптомы опасные — подчеркни)
+
+ВАЖНЫЕ ПРАВИЛА:
+- Все ответы на русском языке.
+- Основывайся на доказательной медицине (клинические рекомендации, МКБ-10/11).
+- Если симптомов недостаточно для ≥50% — задай ещё вопросы, не выдавай пустой список.
+- При подозрении на неотложное состояние (инфаркт, инсульт, анафилаксия и т.д.) — сразу напиши "⚠️ НЕОТЛОЖНОЕ СОСТОЯНИЕ" и рекомендацию вызвать скорую.
+- НЕ назначай лечение и дозировки.
+- НЕ давай окончательный диагноз — только список возможных состояний.
+- Используй режим мышления (reasoning) для анализа симптомов и расчёта вероятностей.`;
+        }
+
+        // ============================================================
+        // ПЕРЕКЛЮЧЕНИЕ РЕЖИМОВ
+        // ============================================================
+        function setMode(mode) {
+            currentMode = mode;
+
+            // Визуальное переключение кнопок
+            modeDirect.className = mode === 'direct' ? 'active' : '';
+            modeServer.className = mode === 'server' ? 'active' : '';
+
+            // Показываем/скрываем элементы
+            if (mode === 'direct') {
+                modelGroup.style.display = 'inline';
+                keyGroup.style.display = 'inline';
+                serverStatusGroup.style.display = 'none';
+            } else {
+                modelGroup.style.display = 'none';
+                keyGroup.style.display = 'none';
+                serverStatusGroup.style.display = 'inline';
+                checkServer();
+            }
+        }
+
+        // ============================================================
+        // ПРОВЕРКА СЕРВЕРА
+        // ============================================================
+        async function checkServer() {
+            if (currentMode !== 'server') return;
+
+            serverIndicator.className = 'server-indicator checking';
+            serverIndicator.textContent = '● проверка...';
+
+            try {
+                const res = await fetch(SERVER_BASE + '/api/status');
+                if (res.ok) {
+                    const data = await res.json();
+                    serverIndicator.className = 'server-indicator online';
+                    let statusText = '● сервер онлайн';
+                    if (data.index_loaded) {
+                        statusText += ` | 📚 ${data.total_chunks} чанков`;
+                    } else {
+                        statusText += ' | 📚 индекс не загружен';
+                    }
+                    if (!data.api_key_configured) {
+                        statusText += ' | ⚠️ ключ не настроен';
+                    }
+                    serverIndicator.textContent = statusText;
+                } else {
+                    serverIndicator.className = 'server-indicator offline';
+                    serverIndicator.textContent = '● ошибка сервера';
+                }
+            } catch (e) {
+                serverIndicator.className = 'server-indicator offline';
+                serverIndicator.textContent = '● сервер не найден (localhost:3000)';
+            }
+        }
+
+        // ============================================================
+        // УПРАВЛЕНИЕ API-КЛЮЧОМ
+        // ============================================================
+        function saveKey() {
+            apiKey = apiKeyInput.value.trim();
+            localStorage.setItem('deepseek_api_key', apiKey);
+            checkKey();
+        }
+
+        async function checkKey() {
+            if (!apiKey) {
+                apiStatus.className = 'api-status na';
+                apiStatus.textContent = '● ключ не задан';
+                return;
+            }
+            apiStatus.className = 'api-status na';
+            apiStatus.textContent = '● проверка...';
+            try {
+                const res = await fetch(DEEPSEEK_BASE + '/v1/models', {
+                    headers: { 'Authorization': 'Bearer ' + apiKey }
+                });
+                if (res.ok) {
+                    apiStatus.className = 'api-status ok';
+                    apiStatus.textContent = '● ключ действителен';
+                } else {
+                    apiStatus.className = 'api-status err';
+                    apiStatus.textContent = '● ошибка: ' + res.status;
+                }
+            } catch (e) {
+                apiStatus.className = 'api-status err';
+                apiStatus.textContent = '● нет соединения';
+            }
+        }
+
+        // ============================================================
+        // ДОБАВЛЕНИЕ СООБЩЕНИЯ В ЧАТ
+        // ============================================================
+        function addMessage(role, text, thinkingText, sources) {
+            const div = document.createElement('div');
+            div.className = 'msg ' + role;
+
+            if (role === 'loading') {
+                div.textContent = 'Думаю';
+                chatEl.appendChild(div);
+                chatEl.scrollTop = chatEl.scrollHeight;
+                return div;
+            }
+
+            // Парсим ссылки в тексте
+            const formatted = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+            div.innerHTML = formatted;
+
+            if (role === 'bot') {
+                // Блок рассуждений (reasoning)
+                if (thinkingText) {
+                    const label = document.createElement('div');
+                    label.className = 'thinking-label';
+                    label.textContent = '🧠 Показать рассуждения';
+                    label.onclick = function () {
+                        const block = this.nextElementSibling;
+                        if (block) {
+                            block.style.display = block.style.display === 'none' ? 'block' : 'none';
+                            this.textContent = block.style.display === 'none' ? '🧠 Показать рассуждения' : '🧠 Скрыть рассуждения';
+                        }
+                    };
+                    div.appendChild(label);
+
+                    const block = document.createElement('div');
+                    block.className = 'thinking';
+                    block.style.display = 'none';
+                    block.textContent = thinkingText;
+                    div.appendChild(block);
+                }
+
+                // Блок источников (RAG)
+                if (sources && sources.length > 0) {
+                    const sourcesDiv = document.createElement('div');
+                    sourcesDiv.className = 'sources';
+
+                    const label = document.createElement('div');
+                    label.className = 'sources-label';
+                    label.textContent = '📚 Источники из литературы';
+                    sourcesDiv.appendChild(label);
+
+                    sources.forEach(s => {
+                        const item = document.createElement('div');
+                        item.className = 'source-item';
+                        const simPercent = (s.similarity * 100).toFixed(1);
+                        item.textContent = `📄 ${s.source}${s.page ? `, стр. ${s.page}` : ''} — совпадение ${simPercent}%`;
+                        sourcesDiv.appendChild(item);
+                    });
+
+                    div.appendChild(sourcesDiv);
+                }
+            }
+
+            chatEl.appendChild(div);
+            chatEl.scrollTop = chatEl.scrollHeight;
+            return div;
+        }
+
+        // ============================================================
+        // ОТПРАВКА СООБЩЕНИЯ
+        // ============================================================
+        async function sendMessage() {
+            const text = inputEl.value.trim();
+            if (!text) return;
+
+            if (currentMode === 'direct' && !apiKey) {
+                addMessage('error', '⚠️ Пожалуйста, введите API-ключ DeepSeek в панели настроек.');
+                return;
+            }
+
+            // Очищаем поле
+            inputEl.value = '';
+            inputEl.style.height = 'auto';
+            sendBtn.disabled = true;
+
+            // Добавляем сообщение пользователя
+            addMessage('user', text);
+
+            // Добавляем индикатор загрузки
+            const loadingEl = addMessage('loading', 'Думаю');
+
+            // Обновляем историю
+            messages.push({ role: 'user', content: text });
+
+            try {
+                if (currentMode === 'server') {
+                    await sendViaServer(text, loadingEl);
+                } else {
+                    await sendViaDirect(text, loadingEl);
+                }
+            } catch (e) {
+                loadingEl.remove();
+                addMessage('error', '⚠️ Ошибка соединения: ' + e.message);
+                messages.pop();
+            }
+
+            sendBtn.disabled = false;
+            inputEl.focus();
+        }
+
+        // ============================================================
+        // РЕЖИМ: ПРЯМОЕ ПОДКЛЮЧЕНИЕ (без сервера)
+        // ============================================================
+        async function sendViaDirect(text, loadingEl) {
+            const model = modelSelect.value;
+
+            const res = await fetch(DEEPSEEK_BASE + '/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + apiKey
+                },
+                body: JSON.stringify({
+                    model: model,
+                    messages: messages,
+                    stream: false,
+                    max_tokens: 8192
+                })
+            });
+
+            // Удаляем индикатор загрузки
+            loadingEl.remove();
+
+            if (!res.ok) {
+                const errData = await res.text();
+                let errMsg = 'Ошибка API: ' + res.status;
+                try {
+                    const errJson = JSON.parse(errData);
+                    errMsg = errJson.error?.message || errMsg;
+                } catch (e) { }
+                addMessage('error', '⚠️ ' + errMsg);
+                messages.pop();
+                return;
+            }
+
+            const data = await res.json();
+            const reply = data.choices[0].message.content;
+            const reasoning = data.choices[0].message.reasoning_content || '';
+
+            addMessage('bot', reply, reasoning);
+            messages.push({ role: 'assistant', content: reply });
+
+            // Ограничиваем историю (держать последние ~20 сообщений)
+            if (messages.length > 22) {
+                const systemMsg = messages[0];
+                messages = [systemMsg, ...messages.slice(-20)];
+            }
+        }
+
+        // ============================================================
+        // РЕЖИМ: СЕРВЕР (с RAG)
+        // ============================================================
+        async function sendViaServer(text, loadingEl) {
+            // Отправляем историю без system prompt (сервер сам добавит)
+            const history = messages.slice(1); // без system
+
+            const res = await fetch(SERVER_BASE + '/api/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    message: text,
+                    history: history
+                })
+            });
+
+            // Удаляем индикатор загрузки
+            loadingEl.remove();
+
+            if (!res.ok) {
+                const errData = await res.json();
+                addMessage('error', '⚠️ ' + (errData.error || 'Ошибка сервера: ' + res.status));
+                messages.pop();
+                return;
+            }
+
+            const data = await res.json();
+            const reply = data.reply;
+            const reasoning = data.reasoning || '';
+            const sources = data.sources || [];
+
+            addMessage('bot', reply, reasoning, sources);
+            messages.push({ role: 'assistant', content: reply });
+
+            // Ограничиваем историю
+            if (messages.length > 22) {
+                const systemMsg = messages[0];
+                messages = [systemMsg, ...messages.slice(-20)];
+            }
+        }
+
+        // ============================================================
+        // АВТО-ВЫСОТА TEXTAREA
+        // ============================================================
+        inputEl.addEventListener('input', function () {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+        });
+
+        // ============================================================
+        // ЗАГРУЗКА ПРИ СТАРТЕ
+        // ============================================================
+        if (apiKey) checkKey();
+    </script>
+</body>
+
+</html>

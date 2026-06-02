@@ -1,0 +1,23 @@
+{
+  "name": "medical-chat-deepseek",
+  "version": "1.0.0",
+  "description": "Медицинский чат-помощник на DeepSeek V4 Flash + RAG",
+  "main": "server.mjs",
+  "scripts": {
+    "start": "node server.mjs",
+    "build-index": "node rag/build-index.mjs",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "deepseek",
+    "medical",
+    "chat",
+    "rag"
+  ],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "pdf-parse": "^2.4.5"
+  }
+}

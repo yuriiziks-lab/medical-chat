@@ -1,0 +1,19 @@
+# API-ключи и конфиденциальные данные
+rag/config.json
+rag/index.json
+
+# Сырые данные
+rag/extracted.json
+rag/chunked.json
+rag/embedded.json
+
+# Зависимости
+node_modules/
+
+# Литература (PDF-файлы)
+Libr/
+literature/
+
+# Системное
+.DS_Store
+Thumbs.db

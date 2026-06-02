@@ -1,0 +1,23 @@
+# render.yaml — конфигурация для Render.com
+# Документация: https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: medical-chat
+    env: node
+    region: frankfurt  # Ближайший регион к Европе/Риге
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.mjs
+    healthCheckPath: /api/status
+    envVars:
+      - key: DEEPSEEK_API_KEY
+        sync: false  # Будет запрошено при деплое
+      - key: LLM_MODEL
+        value: deepseek-v4-flash
+      - key: EMBEDDING_MODEL
+        value: deepseek-embedding-v2
+      - key: DEEPSEEK_BASE
+        value: https://api.deepseek.com
+      - key: NODE_VERSION
+        value: 22
