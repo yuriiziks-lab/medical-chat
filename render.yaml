@@ -19,5 +19,3 @@ services:
         value: deepseek-embedding-v2
       - key: DEEPSEEK_BASE
         value: https://api.deepseek.com
-      - key: NODE_VERSION
-        value: 22
